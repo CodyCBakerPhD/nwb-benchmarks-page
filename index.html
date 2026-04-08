@@ -294,8 +294,7 @@
 // ============================================================
 // CONSTANTS
 // ============================================================
-const GITHUB_API_BASE = "https://api.github.com/repos/neurodatawithoutborders/nwb-benchmarks-results";
-const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/neurodatawithoutborders/nwb-benchmarks-results/main";
+const BUNDLE_URL = "https://raw.githubusercontent.com/NeurodataWithoutBorders/nwb-benchmarks-results/min/bundle.json.gz";
 
 const ENVIRONMENT_TIMEPOINTS = {
     "2024-06-30": "9e225115ea6c99b60d419454a9457bb5db93c7b7",
@@ -483,7 +482,7 @@ function normalizeResults(benchmarkResults) {
 
 function parseTimestamp(ts) {
     if (!ts) return null;
-    const parts = ts.split('-');
+    const parts = ts.split(/[-_]/);
     if (parts.length >= 6) {
         return new Date(
             parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]),
@@ -497,7 +496,11 @@ function parseTimestamp(ts) {
  * Parse a single results JSON file into flat result records.
  */
 function parseResultsFile(data, filename) {
+    // Support both old format (database_version, environment_id, machine_id)
+    // and new format (version integer, environment_hash, machine_hash)
     const dbVersion = data.database_version || null;
+    const environmentId = data.environment_id || data.environment_hash || null;
+    const machineId = data.machine_id || data.machine_hash || null;
     if (!dbVersion) {
         debugLog(`  ${filename}: no database_version field`, 'warn');
         return [];
@@ -505,8 +508,6 @@ function parseResultsFile(data, filename) {
 
     const timestamp = data.timestamp;
     const commitHash = data.commit_hash;
-    const environmentId = data.environment_id;
-    const machineId = data.machine_id;
     const resultsObj = data.results;
 
     if (!resultsObj || typeof resultsObj !== 'object') {
@@ -575,24 +576,32 @@ function parseMachineFile(data, fileId) {
 }
 
 // ============================================================
-// GITHUB DATA LOADING
+// DATA LOADING
 // ============================================================
 
-async function fetchGitHubDir(path) {
-    const url = `${GITHUB_API_BASE}/contents/${path}`;
-    debugLog(`Fetching directory listing: ${url}`, 'info');
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`GitHub API error ${resp.status} for ${path}`);
-    const data = await resp.json();
-    debugLog(`  Found ${data.length} entries in ${path}`, 'info');
-    return data;
-}
-
-async function fetchRawJSON(path) {
-    const url = `${GITHUB_RAW_BASE}/${path}`;
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch error ${resp.status} for ${path}`);
-    return resp.json();
+async function fetchBundle() {
+    debugLog(`Fetching bundle: ${BUNDLE_URL}`, 'info');
+    const resp = await fetch(BUNDLE_URL);
+    if (!resp.ok) throw new Error(`Fetch error ${resp.status} for bundle`);
+    // DecompressionStream requires Chrome 80+, Firefox 113+, Safari 16.4+
+    const ds = new DecompressionStream('gzip');
+    const decompressed = resp.body.pipeThrough(ds);
+    const reader = decompressed.getReader();
+    const chunks = [];
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+    }
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    const combined = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+    }
+    const text = new TextDecoder().decode(combined);
+    return JSON.parse(text);
 }
 
 async function loadData() {
@@ -611,38 +620,32 @@ async function loadData() {
     debugLog(`Starting load. Min version: ${minVersion}, Exclude before: ${excludeBefore || 'none'}`, 'info');
 
     try {
-        // 1. Load results
-        setStatus('<span class="loading-spinner"></span> Fetching results file list...', 0);
-        const resultsFiles = await fetchGitHubDir('results');
-        const jsonFiles = resultsFiles.filter(f => f.name.endsWith('.json'));
-        const totalFiles = jsonFiles.length;
-        debugLog(`Found ${totalFiles} JSON result files`, 'info');
+        // Load the single bundle
+        setStatus('<span class="loading-spinner"></span> Fetching bundle...', 0);
+        const bundle = await fetchBundle();
+        const keys = Object.keys(bundle);
+        debugLog(`Bundle loaded with ${keys.length} entries`, 'info');
 
+        const resultKeys = keys.filter(k => k.startsWith('results/'));
+        const envKeys = keys.filter(k => k.startsWith('environments/'));
+        const machineKeys = keys.filter(k => k.startsWith('machines/'));
+        debugLog(`Found ${resultKeys.length} result files, ${envKeys.length} environment files, ${machineKeys.length} machine files`, 'info');
+
+        // 1. Parse results
         let skippedVersion = 0;
-        let skippedError = 0;
         let parsedFiles = 0;
+        const totalFiles = resultKeys.length;
 
-        const BATCH_SIZE = 10;
-        for (let i = 0; i < jsonFiles.length; i += BATCH_SIZE) {
-            const batch = jsonFiles.slice(i, i + BATCH_SIZE);
-            const promises = batch.map(f =>
-                fetchRawJSON(`results/${f.name}`)
-                    .then(data => ({ data, name: f.name }))
-                    .catch(e => { debugLog(`  Failed to fetch ${f.name}: ${e.message}`, 'error'); return null; })
-            );
-            const batchResults = await Promise.all(promises);
+        for (let i = 0; i < resultKeys.length; i++) {
+            const key = resultKeys[i];
+            const data = bundle[key];
+            const name = key.replace('results/', '');
 
-            for (const item of batchResults) {
-                if (!item) { skippedError++; continue; }
-                const { data, name } = item;
-
-                const ver = data.database_version;
-                if (!ver || compareVersions(ver, minVersion) < 0) {
-                    debugLog(`  ${name}: skipped (version ${ver || 'missing'} < ${minVersion})`, 'warn');
-                    skippedVersion++;
-                    continue;
-                }
-
+            const ver = data.database_version;
+            if (!ver || compareVersions(ver, minVersion) < 0) {
+                debugLog(`  ${name}: skipped (version ${ver || 'missing'} < ${minVersion})`, 'warn');
+                skippedVersion++;
+            } else {
                 const records = parseResultsFile(data, name);
                 if (records.length === 0) {
                     debugLog(`  ${name}: parsed but produced 0 records`, 'warn');
@@ -651,14 +654,16 @@ async function loadData() {
                 parsedFiles++;
             }
 
-            const pct = Math.round(5 + ((i + BATCH_SIZE) / totalFiles) * 70);
-            setStatus(
-                `<span class="loading-spinner"></span> Loaded ${Math.min(i + BATCH_SIZE, totalFiles)}/${totalFiles} files ` +
-                `(${DB.results.length} records from ${parsedFiles} files)...`, Math.min(pct, 75)
-            );
+            if ((i + 1) % 20 === 0 || i === totalFiles - 1) {
+                const pct = Math.round(5 + ((i + 1) / totalFiles) * 70);
+                setStatus(
+                    `<span class="loading-spinner"></span> Parsed ${i + 1}/${totalFiles} result files ` +
+                    `(${DB.results.length} records from ${parsedFiles} files)...`, Math.min(pct, 75)
+                );
+            }
         }
 
-        debugLog(`Results loading complete: ${parsedFiles} files parsed, ${skippedVersion} skipped (version), ${skippedError} errors, ${DB.results.length} total records`, 'info');
+        debugLog(`Results loading complete: ${parsedFiles} files parsed, ${skippedVersion} skipped (version), ${DB.results.length} total records`, 'info');
 
         // Filter by date
         if (excludeBefore) {
@@ -678,48 +683,25 @@ async function loadData() {
         const types = [...new Set(DB.results.map(r => r.benchmark_name.split('.')[0]))];
         debugLog(`Unique benchmark types: ${types.join(', ')}`, 'info');
 
-        // 2. Load environments
+        // 2. Parse environments
         setStatus('<span class="loading-spinner"></span> Loading environments...', 78);
-        try {
-            const envFiles = await fetchGitHubDir('environments');
-            const envJsonFiles = envFiles.filter(f => f.name.endsWith('.json'));
-            for (let i = 0; i < envJsonFiles.length; i += BATCH_SIZE) {
-                const batch = envJsonFiles.slice(i, i + BATCH_SIZE);
-                const promises = batch.map(f =>
-                    fetchRawJSON(`environments/${f.name}`)
-                        .then(data => ({ data, name: f.name }))
-                        .catch(() => null)
-                );
-                const batchData = await Promise.all(promises);
-                for (const item of batchData) {
-                    if (!item) continue;
-                    const fileId = item.name.replace('environment-', '').replace('.json', '');
-                    const env = parseEnvironmentFile(item.data, fileId);
-                    if (env) DB.environments.push(env);
-                }
-            }
-            debugLog(`Loaded ${DB.environments.length} environments`, 'info');
-        } catch (e) {
-            debugLog(`Could not load environments: ${e.message}`, 'warn');
+        for (const key of envKeys) {
+            const name = key.replace('environments/', '');
+            const fileId = name.replace('environment-', '').replace('.json', '');
+            const env = parseEnvironmentFile(bundle[key], fileId);
+            if (env) DB.environments.push(env);
         }
+        debugLog(`Loaded ${DB.environments.length} environments`, 'info');
 
-        // 3. Load machines
+        // 3. Parse machines
         setStatus('<span class="loading-spinner"></span> Loading machines...', 90);
-        try {
-            const machineFiles = await fetchGitHubDir('machines');
-            const machineJsonFiles = machineFiles.filter(f => f.name.endsWith('.json'));
-            for (const f of machineJsonFiles) {
-                try {
-                    const data = await fetchRawJSON(`machines/${f.name}`);
-                    const fileId = f.name.replace('machine-', '').replace('.json', '');
-                    const machine = parseMachineFile(data, fileId);
-                    if (machine) DB.machines.push(machine);
-                } catch (e) {}
-            }
-            debugLog(`Loaded ${DB.machines.length} machines`, 'info');
-        } catch (e) {
-            debugLog(`Could not load machines: ${e.message}`, 'warn');
+        for (const key of machineKeys) {
+            const name = key.replace('machines/', '');
+            const fileId = name.replace('machine-', '').replace('.json', '');
+            const machine = parseMachineFile(bundle[key], fileId);
+            if (machine) DB.machines.push(machine);
         }
+        debugLog(`Loaded ${DB.machines.length} machines`, 'info');
 
         // Populate machine selector
         const machineSelect = document.getElementById('machineSelect');
