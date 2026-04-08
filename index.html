@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NWB Benchmarks Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-card: #ffffff;
+            --text-primary: #212529;
+            --text-secondary: #6c757d;
+            --border-color: #dee2e6;
+            --accent-color: #0d6efd;
+            --accent-hover: #0b5ed7;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08);
+            --shadow-hover: 0 4px 16px rgba(0,0,0,0.12);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            font-size: 0.95rem;
+            opacity: 0.85;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem 2rem;
+        }
+
+        .controls {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: flex-end;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .control-group label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        select, input {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            background: white;
+            min-width: 200px;
+            transition: border-color 0.2s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        }
+
+        button {
+            padding: 0.5rem 1.5rem;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+        }
+
+        button:disabled {
+            background: #adb5bd;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-bar {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            font-size: 0.9rem;
+        }
+
+        .status-bar .progress-container {
+            margin-top: 0.5rem;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 6px;
+        }
+
+        .status-bar .progress-bar {
+            height: 100%;
+            background: var(--accent-color);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .section {
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent-color);
+            display: inline-block;
+        }
+
+        .plot-card {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: box-shadow 0.2s;
+        }
+
+        .plot-card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .plot-card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .plot-card .caption {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-bottom: 1rem;
+        }
+
+        .plot-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .plot-grid.two-col {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        @media (max-width: 1024px) {
+            .plot-grid.two-col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tab-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 0.6rem 1.2rem;
+            background: transparent;
+            color: var(--text-secondary);
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+
+        .tab-btn:hover:not(.active) {
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e9ecef;
+            border-top: 2px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.5rem;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .badge.success { background: #d1e7dd; color: #0a3622; }
+        .badge.info { background: #cff4fc; color: #055160; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-content">
+        <h1>NWB Benchmarks Dashboard</h1>
+        <p>Interactive visualization of streaming and I/O benchmarks from
+            <a href="https://github.com/neurodatawithoutborders/nwb-benchmarks-results"
+               style="color:#8ec8f8" target="_blank">nwb-benchmarks-results</a>
+        </p>
+    </div>
+</div>
+
+<div class="container">
+    <div class="controls">
+        <div class="control-group">
+            <label>Machine</label>
+            <select id="machineSelect">
+                <option value="">All machines</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Min Results Version</label>
+            <input type="text" id="minVersion" value="3.0.0" style="min-width:100px">
+        </div>
+        <div class="control-group">
+            <label>Exclude Before</label>
+            <input type="date" id="excludeBefore" value="">
+        </div>
+        <div class="control-group">
+            <button id="loadBtn" onclick="loadData()">Load Data from GitHub</button>
+        </div>
+        <div class="control-group">
+            <button id="plotBtn" onclick="renderAllPlots()" disabled>Render Plots</button>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">
+        <span id="statusText">Ready. Click "Load Data from GitHub" to begin.</span>
+        <div class="progress-container" style="display:none" id="progressContainer">
+            <div class="progress-bar" id="progressBar" style="width:0%"></div>
+        </div>
+    </div>
+
+    <div class="tab-container">
+        <div class="tab-buttons">
+            <button class="tab-btn active" onclick="switchTab('tab-read')">File Reading</button>
+            <button class="tab-btn" onclick="switchTab('tab-slice')">Slicing</button>
+            <button class="tab-btn" onclick="switchTab('tab-heatmap')">Method Rankings</button>
+            <button class="tab-btn" onclick="switchTab('tab-versions')">Across Versions</button>
+            <button class="tab-btn" onclick="switchTab('tab-download')">Download vs Stream</button>
+            <button class="tab-btn" onclick="switchTab('tab-network')">Network Tracking</button>
+        </div>
+
+        <div class="tab-content active" id="tab-read">
+            <div class="section">
+                <div class="section-title">Remote File Reading Benchmarks</div>
+                <div class="plot-grid">
+                    <div class="plot-card">
+                        <h3>File Open Times — h5py / zarr level</h3>
+                        <div class="caption">Benchmark execution times across different methods and modalities.</div>
+                        <div id="plot-read-h5py"></div>
+                    </div>
+                    <div class="plot-card">
+                        <h3>File Open Times — PyNWB level</h3>
+                        <div class="caption">Benchmark execution times using PyNWB across modalities.</div>
+                        <div id="plot-read-pynwb"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-slice">
+            <div class="section">
+                <div class="section-title">Remote Slicing Benchmarks</div>
+                <div class="plot-card">
+                    <h3>Slice Time vs Slice Size</h3>
+                    <div class="caption">Performance trends as a function of data slice size. Data points indicate combined file open + slice times when streaming data remotely.</div>
+                    <div id="plot-slice-vs-size"></div>
+                </div>
+                <div class="plot-card">
+                    <h3>Slice Time Only (No File Open)</h3>
+                    <div class="caption">Slice time only when streaming data remotely.</div>
+                    <div id="plot-slice-only"></div>
+                </div>
+                <div class="plot-card">
+                    <h3>Slice Distributions by Range</h3>
+                    <div class="caption">Distribution of slice times per modality for each slice range.</div>
+                    <div id="plot-slice-distributions"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-heatmap">
+            <div class="section">
+                <div class="section-title">Method Rankings</div>
+                <div class="plot-card">
+                    <h3>Mean Performance Heatmap</h3>
+                    <div class="caption">Heatmap showing mean benchmark performance times (in seconds) across different data modalities. Stars indicate the fastest method for each modality.</div>
+                    <div id="plot-heatmap-read"></div>
+                    <div id="plot-heatmap-pynwb"></div>
+                    <div id="plot-heatmap-slice"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-versions">
+            <div class="section">
+                <div class="section-title">Performance Across Environment Versions</div>
+                <div class="plot-card">
+                    <h3>File Reading Over Time</h3>
+                    <div class="caption">Performance trends across different software environment versions. Each line represents a different method.</div>
+                    <div id="plot-versions-read"></div>
+                </div>
+                <div class="plot-card">
+                    <h3>Slicing Over Time</h3>
+                    <div class="caption">Remote slicing performance trends across different software environment versions.</div>
+                    <div id="plot-versions-slice"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-download">
+            <div class="section">
+                <div class="section-title">Download vs Stream Comparison</div>
+                <div class="plot-card">
+                    <h3>Streaming vs Local (After Download)</h3>
+                    <div class="caption">Comparison of remote streaming times vs local access times after downloading. Helps determine when to download vs stream.</div>
+                    <div id="plot-download-vs-stream"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="tab-network">
+            <div class="section">
+                <div class="section-title">Network Tracking</div>
+                <div class="plot-card">
+                    <h3>Network Metrics — File Reading</h3>
+                    <div class="caption">Network traffic metrics during file reading benchmarks.</div>
+                    <div id="plot-network-read"></div>
+                </div>
+                <div class="plot-card">
+                    <h3>Network Metrics — Slicing</h3>
+                    <div class="caption">Network traffic metrics during slicing benchmarks.</div>
+                    <div id="plot-network-slice"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+// CONSTANTS (mirroring _processing.py and _visualization.py)
+// ============================================================
+const GITHUB_API_BASE = "https://api.github.com/repos/neurodatawithoutborders/nwb-benchmarks-results";
+const GITHUB_RAW_BASE = "https://raw.githubusercontent.com/neurodatawithoutborders/nwb-benchmarks-results/main";
+
+const ENVIRONMENT_TIMEPOINTS = {
+    "2024-06-30": "9e225115ea6c99b60d419454a9457bb5db93c7b7",
+    "2025-06-30": "15d059d5b6b9047f9bbeb4ac77bb4461411904c7",
+    "2025-09-01": "052cb4d925793bbbc270d9384a60bc24023025b7",
+};
+
+const DEFAULT_BENCHMARK_ORDER = [
+    "hdf5 h5py remfile no cache",
+    "hdf5 h5py fsspec https no cache",
+    "hdf5 h5py fsspec s3 no cache",
+    "hdf5 h5py remfile with cache",
+    "hdf5 h5py fsspec https with cache",
+    "hdf5 h5py fsspec s3 with cache",
+    "hdf5 h5py ros3",
+    "lindi h5py",
+    "zarr s3",
+    "zarr s3 force no consolidated",
+];
+
+const PYNWB_READ_ORDER = DEFAULT_BENCHMARK_ORDER.map(m =>
+    m.replace("h5py", "pynwb").replace(/^zarr/, "zarr pynwb")
+);
+
+const MODALITY_ORDER = ["Ecephys", "Ophys", "Icephys"];
+
+// Color palette (Paired-ish)
+const PAIRED_COLORS = [
+    '#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99','#e31a1c',
+    '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99','#b15928'
+];
+
+// ============================================================
+// GLOBAL STATE
+// ============================================================
+let DB = {
+    results: [],       // flat array of result objects
+    machines: [],      // machine objects
+    environments: [],  // environment objects
+    loaded: false,
+};
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+}
+
+// ============================================================
+// STATUS HELPERS
+// ============================================================
+function setStatus(msg, progress = null) {
+    document.getElementById('statusText').innerHTML = msg;
+    const pc = document.getElementById('progressContainer');
+    const pb = document.getElementById('progressBar');
+    if (progress !== null) {
+        pc.style.display = 'block';
+        pb.style.width = progress + '%';
+    } else {
+        pc.style.display = 'none';
+    }
+}
+
+// ============================================================
+// PARSING LOGIC (mirrors _models.py)
+// ============================================================
+
+/**
+ * Parse a parameter_case string into a dict.
+ * Handles formats like: "('OphysName', 'https://...')" or
+ * "('name', 'url', 'obj', 'slice(0,100,None)')"
+ */
+function parseParameterCase(s) {
+    if (!s || s === "null") return {};
+
+    // Try to extract key-value pairs
+    // The Python code uses ast.literal_eval; we approximate it
+    let cleaned = s.trim();
+
+    // Handle the case where it's already an object/dict
+    if (cleaned.startsWith('{')) {
+        try { return JSON.parse(cleaned); } catch(e) {}
+    }
+
+    // It's a tuple-like string: ('val1', 'val2', ...)
+    // Extract string contents between quotes and slice(...) patterns
+    const tokens = [];
+    const regex = /(?:slice\([^)]*\))|(?:'([^']*)')|(?:"([^"]*)")/g;
+    let match;
+    while ((match = regex.exec(cleaned)) !== null) {
+        if (match[0].startsWith('slice')) {
+            tokens.push(match[0]);
+        } else {
+            tokens.push(match[1] || match[2] || '');
+        }
+    }
+
+    // Map positional to named keys (mirroring parse_parameter_case)
+    if (tokens.length === 1) {
+        return { https_url: tokens[0] };
+    }
+
+    const keyMap = ['name', 'https_url', 'object_name', 'slice_range'];
+    const result = {};
+    tokens.forEach((t, i) => {
+        if (i < keyMap.length) {
+            result[keyMap[i]] = t;
+        }
+    });
+    return result;
+}
+
+/**
+ * Normalize benchmark results to a consistent {variable: [values]} format.
+ * Mirrors Results.normalize_time_and_network_results
+ */
+function normalizeResults(benchmarkResults) {
+    if (typeof benchmarkResults !== 'object' || Array.isArray(benchmarkResults)) {
+        // It's a list of time values or a single value
+        const vals = Array.isArray(benchmarkResults) ? benchmarkResults : [benchmarkResults];
+        return { time: vals.map(Number) };
+    }
+
+    // It's a dict with network metrics
+    const results = { ...benchmarkResults };
+    if (results.total_traffic_in_number_of_web_packets !== 0) {
+        results.mean_time_per_web_packet =
+            results.total_transfer_time_in_seconds / results.total_traffic_in_number_of_web_packets;
+    } else {
+        results.mean_time_per_web_packet = NaN;
+    }
+
+    // Ensure all values are arrays
+    const normalized = {};
+    for (const [k, v] of Object.entries(results)) {
+        normalized[k] = Array.isArray(v) ? v.map(Number) : [Number(v)];
+    }
+    return normalized;
+}
+
+/**
+ * Parse a single results JSON file into an array of flat result records.
+ */
+function parseResultsFile(data) {
+    const dbVersion = data.database_version || null;
+    if (!dbVersion) return [];
+
+    // Version check
+    if (compareVersions(dbVersion, '1.0.0') < 0) return [];
+
+    const timestamp = data.timestamp;
+    const commitHash = data.commit_hash;
+    const environmentId = data.environment_id;
+    const machineId = data.machine_id;
+
+    const results = [];
+    for (const [benchmarkName, parameterCases] of Object.entries(data.results || {})) {
+        for (const [paramCaseStr, benchmarkResults] of Object.entries(parameterCases)) {
+            const paramCase = parseParameterCase(paramCaseStr);
+            const normalized = normalizeResults(benchmarkResults);
+            for (const [variable, values] of Object.entries(normalized)) {
+                for (const value of values) {
+                    results.push({
+                        version: dbVersion,
+                        timestamp: parseTimestamp(timestamp),
+                        commit_hash: commitHash,
+                        environment_id: environmentId,
+                        machine_id: machineId,
+                        benchmark_name: benchmarkName,
+                        parameter_case_name: paramCase.name || null,
+                        parameter_case_https_url: paramCase.https_url || null,
+                        parameter_case_object_name: paramCase.object_name || null,
+                        parameter_case_slice_range: paramCase.slice_range || null,
+                        value: value,
+                        variable: variable,
+                    });
+                }
+            }
+        }
+    }
+    return results;
+}
+
+function parseTimestamp(ts) {
+    // format: "2024-01-15-12-30-00"
+    if (!ts) return null;
+    const parts = ts.split('-');
+    if (parts.length >= 6) {
+        return new Date(parts[0], parts[1]-1, parts[2], parts[3], parts[4], parts[5]);
+    }
+    return new Date(ts);
+}
+
+function compareVersions(a, b) {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = pa[i] || 0;
+        const nb = pb[i] || 0;
+        if (na > nb) return 1;
+        if (na < nb) return -1;
+    }
+    return 0;
+}
+
+/**
+ * Parse environment JSON file.
+ */
+function parseEnvironmentFile(data, fileId) {
+    if (!data || Object.keys(data).length > 1) return null;
+    const preamble = Object.keys(data)[0];
+    const packages = {};
+    for (const pkg of data[preamble]) {
+        if (pkg && pkg.name && pkg.version) {
+            packages[pkg.name] = pkg.version;
+        }
+    }
+    if (Object.keys(packages).length === 0) return null;
+    return { environment_id: fileId, preamble, packages };
+}
+
+/**
+ * Parse machine JSON file.
+ */
+function parseMachineFile(data, fileId) {
+    const version = String(data.version || '');
+    if (!version || compareVersions(version, '1.1.0') < 0) return null;
+    return {
+        id: fileId,
+        name: data.name || '',
+        version,
+        os: data.os || {},
+        sys: data.sys || {},
+    };
+}
+
+// ============================================================
+// GITHUB DATA LOADING
+// ============================================================
+
+async function fetchGitHubDir(path) {
+    const url = `${GITHUB_API_BASE}/contents/${path}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`GitHub API error ${resp.status} for ${path}`);
+    return resp.json();
+}
+
+async function fetchRawJSON(path) {
+    const url = `${GITHUB_RAW_BASE}/${path}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Fetch error ${resp.status} for ${path}`);
+    return resp.json();
+}
+
+async function loadData() {
+    const btn = document.getElementById('loadBtn');
+    btn.disabled = true;
+    const minVersion = document.getElementById('minVersion').value || '3.0.0';
+    const excludeBefore = document.getElementById('excludeBefore').value;
+
+    DB.results = [];
+    DB.machines = [];
+    DB.environments = [];
+    DB.loaded = false;
+
+    try {
+        // 1. Load results directory listing
+        setStatus('<span class="loading-spinner"></span> Fetching results file list...', 0);
+        const resultsFiles = await fetchGitHubDir('results');
+        const jsonFiles = resultsFiles.filter(f => f.name.endsWith('.json'));
+        const totalFiles = jsonFiles.length;
+
+        setStatus(`<span class="loading-spinner"></span> Loading ${totalFiles} result files...`, 5);
+
+        // Load in batches to avoid rate limiting
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < jsonFiles.length; i += BATCH_SIZE) {
+            const batch = jsonFiles.slice(i, i + BATCH_SIZE);
+            const promises = batch.map(f => fetchRawJSON(`results/${f.name}`).catch(() => null));
+            const batchData = await Promise.all(promises);
+
+            for (const data of batchData) {
+                if (!data) continue;
+                if (data.database_version && compareVersions(data.database_version, minVersion) >= 0) {
+                    const records = parseResultsFile(data);
+                    DB.results.push(...records);
+                }
+            }
+
+            const pct = Math.round(5 + (i / totalFiles) * 70);
+            setStatus(`<span class="loading-spinner"></span> Loaded ${Math.min(i + BATCH_SIZE, totalFiles)}/${totalFiles} result files (${DB.results.length} records)...`, pct);
+        }
+
+        // Filter by date if specified
+        if (excludeBefore) {
+            const cutoff = new Date(excludeBefore);
+            DB.results = DB.results.filter(r => r.timestamp >= cutoff);
+        }
+
+        // 2. Load environments
+        setStatus('<span class="loading-spinner"></span> Loading environments...', 78);
+        try {
+            const envFiles = await fetchGitHubDir('environments');
+            const envJsonFiles = envFiles.filter(f => f.name.endsWith('.json'));
+            for (let i = 0; i < envJsonFiles.length; i += BATCH_SIZE) {
+                const batch = envJsonFiles.slice(i, i + BATCH_SIZE);
+                const promises = batch.map(f => fetchRawJSON(`environments/${f.name}`).catch(() => null));
+                const batchData = await Promise.all(promises);
+                for (let j = 0; j < batchData.length; j++) {
+                    if (!batchData[j]) continue;
+                    const fileId = batch[j].name.replace('environment-', '').replace('.json', '');
+                    const env = parseEnvironmentFile(batchData[j], fileId);
+                    if (env) DB.environments.push(env);
+                }
+            }
+        } catch(e) {
+            console.warn('Could not load environments:', e);
+        }
+
+        // 3. Load machines
+        setStatus('<span class="loading-spinner"></span> Loading machines...', 90);
+        try {
+            const machineFiles = await fetchGitHubDir('machines');
+            const machineJsonFiles = machineFiles.filter(f => f.name.endsWith('.json'));
+            for (const f of machineJsonFiles) {
+                try {
+                    const data = await fetchRawJSON(`machines/${f.name}`);
+                    const fileId = f.name.replace('machine-', '').replace('.json', '');
+                    const machine = parseMachineFile(data, fileId);
+                    if (machine) DB.machines.push(machine);
+                } catch(e) {}
+            }
+        } catch(e) {
+            console.warn('Could not load machines:', e);
+        }
+
+        // Populate machine selector
+        const machineSelect = document.getElementById('machineSelect');
+        machineSelect.innerHTML = '<option value="">All machines</option>';
+        const machineIds = [...new Set(DB.results.map(r => r.machine_id))];
+        for (const mid of machineIds) {
+            const machine = DB.machines.find(m => m.id === mid);
+            const label = machine ? `${machine.name} (${mid.substring(0,8)}...)` : mid;
+            machineSelect.innerHTML += `<option value="${mid}">${label}</option>`;
+        }
+
+        DB.loaded = true;
+        document.getElementById('plotBtn').disabled = false;
+        setStatus(
+            `✅ Loaded <span class="badge success">${DB.results.length}</span> result records, ` +
+            `<span class="badge info">${DB.environments.length}</span> environments, ` +
+            `<span class="badge info">${DB.machines.length}</span> machines.`,
+            100
+        );
+
+    } catch(e) {
+        setStatus(`❌ Error: ${e.message}`);
+        console.error(e);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// ============================================================
+// PREPROCESSING (mirrors _processing.py)
+// ============================================================
+
+function splitCamelCase(text) {
+    text = text.replace(/PyNWBS3/g, 'PyNWB S3');
+    text = text.replace(/NWBROS3/g, 'NWB ROS3');
+    let result = text.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+    result = result.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+    result = result.replace(/Py NWB/g, 'PyNWB');
+    return result;
+}
+
+function cleanBenchmarkNameTest(name) {
+    let short = name
+        .replace('ContinuousSliceBenchmark', '')
+        .replace('FileReadBenchmark', '')
+        .replace('DownloadBenchmark', '');
+    return splitCamelCase(short).toLowerCase();
+}
+
+function cleanBenchmarkOperation(op) {
+    if (!op) return op;
+    return op
+        .replace('time_read_', '')
+        .replace('track_network_read_', '')
+        .replace('time_download_', '')
+        .replace('zarrpython', 'zarr')
+        .replace(/_/g, ' ');
+}
+
+function preprocessResults(results) {
+    const machineId = document.getElementById('machineSelect').value;
+
+    return results.map(r => {
+        // Split benchmark_name on "."
+        const parts = r.benchmark_name.split('.');
+        const benchmarkNameType = parts[0] || '';
+        let benchmarkNameTest = parts[1] || '';
+        let benchmarkNameOperation = parts[2] || '';
+
+        // Extract modality from parameter_case_name
+        let modality = null;
+        if (r.parameter_case_name) {
+            const mMatch = r.parameter_case_name.match(/^(Ophys|Ecephys|Icephys)/);
+            if (mMatch) modality = mMatch[1];
+        }
+
+        // Extract benchmark label
+        let benchmarkNameLabel = null;
+        const labelMatch = benchmarkNameTest.match(/(ContinuousSliceBenchmark|FileReadBenchmark|DownloadBenchmark)/);
+        if (labelMatch) benchmarkNameLabel = labelMatch[1];
+
+        // Clean test name
+        let cleanedTest = cleanBenchmarkNameTest(benchmarkNameTest);
+
+        // Clean operation
+        let cleanedOp = cleanBenchmarkOperation(benchmarkNameOperation);
+
+        // Handle preloaded
+        const isPreloaded = cleanedTest.includes('preloaded');
+        cleanedTest = cleanedTest.replace(' preloaded', '');
+
+        // Handle local
+        const isLocal = r.benchmark_name.includes('local');
+        cleanedTest = cleanedTest.replace(' local', '').replace('json', 'pynwb');
+
+        if (cleanedOp && cleanedOp.includes('local')) {
+            cleanedOp = cleanedOp.replace(/local (.*)/, cleanedTest + ' $1');
+        }
+
+        // Benchmark name clean
+        let benchmarkNameClean;
+        if (benchmarkNameLabel === 'ContinuousSliceBenchmark') {
+            benchmarkNameClean = cleanedTest;
+        } else if (benchmarkNameLabel === 'FileReadBenchmark' || benchmarkNameLabel === 'DownloadBenchmark') {
+            benchmarkNameClean = cleanedOp;
+        } else {
+            benchmarkNameClean = cleanedTest;
+        }
+
+        // Extract scaling value from slice_range
+        let scalingValue = null;
+        let sliceRange = r.parameter_case_slice_range;
+        if (sliceRange) {
+            const sliceMatch = sliceRange.match(/slice\(0,\s*(\d+)/);
+            if (sliceMatch) scalingValue = parseInt(sliceMatch[1]);
+        }
+
+        return {
+            ...r,
+            benchmark_name_type: benchmarkNameType,
+            benchmark_name_test: cleanedTest,
+            benchmark_name_operation: cleanedOp,
+            benchmark_name_label: benchmarkNameLabel,
+            benchmark_name_clean: benchmarkNameClean || '',
+            modality,
+            is_preloaded: isPreloaded,
+            is_local: isLocal,
+            scaling_value: scalingValue,
+            slice_number: null, // computed per group later
+        };
+    }).filter(r => {
+        if (machineId && r.machine_id !== machineId) return false;
+        return true;
+    });
+}
+
+/**
+ * Assign slice_number as dense rank of scaling_value within each modality.
+ */
+function assignSliceNumbers(records) {
+    // Group by modality, get sorted unique scaling values
+    const modalityScalingValues = {};
+    for (const r of records) {
+        if (r.scaling_value === null) continue;
+        if (!modalityScalingValues[r.modality]) modalityScalingValues[r.modality] = new Set();
+        modalityScalingValues[r.modality].add(r.scaling_value);
+    }
+
+    const modalityRankMap = {};
+    for (const [mod, vals] of Object.entries(modalityScalingValues)) {
+        const sorted = [...vals].sort((a, b) => a - b);
+        const rankMap = {};
+        sorted.forEach((v, i) => { rankMap[v] = i + 1; });
+        modalityRankMap[mod] = rankMap;
+    }
+
+    for (const r of records) {
+        if (r.scaling_value !== null && modalityRankMap[r.modality]) {
+            r.slice_number = modalityRankMap[r.modality][r.scaling_value];
+        }
+    }
+    return records;
+}
+
+function filterByType(records, type) {
+    return records.filter(r => r.benchmark_name_type === type);
+}
+
+function getEnvironmentTimepoint(envId) {
+    for (const [label, hash] of Object.entries(ENVIRONMENT_TIMEPOINTS)) {
+        if (envId === hash) return label;
+    }
+    return null;
+}
+
+// ============================================================
+// PLOTLY HELPERS
+// ============================================================
+
+function getColorForMethod(methodName, idx) {
+    return PAIRED_COLORS[idx % PAIRED_COLORS.length];
+}
+
+function buildMethodColorMap(methods) {
+    const map = {};
+    methods.forEach((m, i) => { map[m] = PAIRED_COLORS[i % PAIRED_COLORS.length]; });
+    return map;
+}
+
+function groupBy(arr, keyFn) {
+    const groups = {};
+    for (const item of arr) {
+        const key = typeof keyFn === 'string' ? item[keyFn] : keyFn(item);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(item);
+    }
+    return groups;
+}
+
+function mean(arr) {
+    if (arr.length === 0) return 0;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function std(arr) {
+    if (arr.length <= 1) return 0;
+    const m = mean(arr);
+    return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+}
+
+// ============================================================
+// PLOT RENDERING
+// ============================================================
+
+function renderAllPlots() {
+    if (!DB.loaded) return;
+
+    setStatus('<span class="loading-spinner"></span> Preprocessing data...');
+    let processed = preprocessResults(DB.results);
+    processed = assignSliceNumbers(processed);
+
+    setStatus('<span class="loading-spinner"></span> Rendering plots...');
+
+    try {
+        plotReadBenchmarks(processed);
+        plotSliceBenchmarks(processed);
+        plotHeatmaps(processed);
+        plotVersions(processed);
+        plotDownloadVsStream(processed);
+        plotNetworkTracking(processed);
+        setStatus('✅ All plots rendered.');
+    } catch(e) {
+        setStatus(`❌ Rendering error: ${e.message}`);
+        console.error(e);
+    }
+}
+
+// ------- 1. FILE READING -------
+
+function plotReadBenchmarks(data) {
+    const readData = filterByType(data, 'time_remote_file_reading');
+    if (readData.length === 0) {
+        plotEmpty('plot-read-h5py', 'No remote file reading data available');
+        plotEmpty('plot-read-pynwb', 'No remote file reading data available');
+        return;
+    }
+
+    plotBoxByModality(readData, DEFAULT_BENCHMARK_ORDER, 'plot-read-h5py', 'Time (s)');
+    plotBoxByModality(readData, PYNWB_READ_ORDER, 'plot-read-pynwb', 'Time (s)');
+}
+
+function plotBoxByModality(data, order, divId, yLabel) {
+    // Filter to only include methods in order
+    const orderSet = new Set(order);
+    const filtered = data.filter(r => orderSet.has(r.benchmark_name_clean) && r.modality);
+
+    if (filtered.length === 0) {
+        plotEmpty(divId, 'No data matching the selected methods');
+        return;
+    }
+
+    const modalities = MODALITY_ORDER.filter(m => filtered.some(r => r.modality === m));
+    const colorMap = buildMethodColorMap(order);
+
+    const traces = [];
+    for (const method of order) {
+        const methodData = filtered.filter(r => r.benchmark_name_clean === method);
+        if (methodData.length === 0) continue;
+
+        for (const mod of modalities) {
+            const modData = methodData.filter(r => r.modality === mod);
+            if (modData.length === 0) continue;
+
+            traces.push({
+                type: 'box',
+                y: modData.map(r => r.value),
+                name: method,
+                legendgroup: method,
+                showlegend: mod === modalities[0],
+                marker: { color: colorMap[method] },
+                boxpoints: 'outliers',
+                xaxis: `x${modalities.indexOf(mod) + 1}`,
+                yaxis: `y${modalities.indexOf(mod) + 1}`,
+            });
+        }
+    }
+
+    const layout = makeSubplotLayout(modalities, yLabel);
+    Plotly.newPlot(divId, traces, layout, { responsive: true });
+}
+
+function makeSubplotLayout(modalities, yLabel) {
+    const n = modalities.length;
+    const layout = {
+        height: 400,
+        margin: { t: 40, b: 60, l: 60, r: 20 },
+        legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center' },
+        font: { family: 'Arial, sans-serif', size: 11 },
+    };
+
+    // Create subplot domains
+    const gap = 0.05;
+    const width = (1 - gap * (n - 1)) / n;
+
+    for (let i = 0; i < n; i++) {
+        const xStart = i * (width + gap);
+        const xAxisKey = i === 0 ? 'xaxis' : `xaxis${i + 1}`;
+        const yAxisKey = i === 0 ? 'yaxis' : `yaxis${i + 1}`;
+
+        layout[xAxisKey] = {
+            domain: [xStart, xStart + width],
+            title: modalities[i],
+            anchor: `y${i > 0 ? i + 1 : ''}`,
+        };
+        layout[yAxisKey] = {
+            title: i === 0 ? yLabel : '',
+            anchor: `x${i > 0 ? i + 1 : ''}`,
+        };
+    }
+
+    return layout;
+}
+
+// ------- 2. SLICING -------
+
+function plotSliceBenchmarks(data) {
+    const sliceData = filterByType(data, 'time_remote_slicing');
+    const readData = filterByType(data, 'time_remote_file_reading');
+
+    if (sliceData.length === 0) {
+        plotEmpty('plot-slice-vs-size', 'No remote slicing data available');
+        plotEmpty('plot-slice-only', 'No remote slicing data available');
+        plotEmpty('plot-slice-distributions', 'No remote slicing data available');
+        return;
+    }
+
+    // Compute avg file open time per modality + method
+    const avgOpenTimes = {};
+    const readGrouped = groupBy(readData, r => `${r.modality}|${r.benchmark_name_clean}`);
+    for (const [key, records] of Object.entries(readGrouped)) {
+        avgOpenTimes[key] = mean(records.map(r => r.value));
+    }
+
+    // Add total_time = value + avg_file_open_time for combined plots
+    const sliceWithTotal = sliceData.map(r => {
+        const key = `${r.modality}|${r.benchmark_name_clean}`;
+        const avgOpen = avgOpenTimes[key] || 0;
+        return { ...r, total_time: r.value + avgOpen, avg_file_open_time: avgOpen };
+    });
+
+    plotSliceVsSize(sliceWithTotal, 'plot-slice-vs-size', 'total_time', 'File Open + Slice Time (s)');
+    plotSliceVsSize(sliceData, 'plot-slice-only', 'value', 'Slice Time Only (s)');
+    plotSliceDistributions(sliceData, 'plot-slice-distributions');
+}
+
+function plotSliceVsSize(data, divId, valueKey, yLabel) {
+    const order = PYNWB_READ_ORDER;
+    const orderSet = new Set(order);
+    const filtered = data.filter(r =>
+        orderSet.has(r.benchmark_name_clean) && r.modality && r.slice_number !== null
+    );
+
+    if (filtered.length === 0) {
+        plotEmpty(divId, 'No slicing data with known slice sizes');
+        return;
+    }
+
+    const modalities = MODALITY_ORDER.filter(m => filtered.some(r => r.modality === m));
+    const colorMap = buildMethodColorMap(order);
+
+    const traces = [];
+    for (const method of order) {
+        const methodData = filtered.filter(r => r.benchmark_name_clean === method);
+        if (methodData.length === 0) continue;
+
+        for (const [mi, mod] of modalities.entries()) {
+            const modData = methodData.filter(r => r.modality === mod);
+            if (modData.length === 0) continue;
+
+            // Group by slice_number, compute mean
+            const bySlice = groupBy(modData, 'slice_number');
+            const sliceNums = Object.keys(bySlice).map(Number).sort((a, b) => a - b);
+            const means = sliceNums.map(sn => mean(bySlice[sn].map(r => r[valueKey] || r.value)));
+
+            traces.push({
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: sliceNums,
+                y: means,
+                name: method,
+                legendgroup: method,
+                showlegend: mi === 0,
+                line: { color: colorMap[method] },
+                marker: { color: colorMap[method], size: 6 },
+                xaxis: `x${mi > 0 ? mi + 1 : ''}`,
+                yaxis: `y${mi > 0 ? mi + 1 : ''}`,
+            });
+        }
+    }
+
+    const layout = makeSubplotLayout(modalities, yLabel);
+    layout.height = 450;
+    Plotly.newPlot(divId, traces, layout, { responsive: true });
+}
+
+function plotSliceDistributions(data, divId) {
+    const order = PYNWB_READ_ORDER;
+    const orderSet = new Set(order);
+    const filtered = data.filter(r =>
+        orderSet.has(r.benchmark_name_clean) && r.modality && r.slice_number !== null
+    );
+
+    if (filtered.length === 0) {
+        plotEmpty(divId, 'No data');
+        return;
+    }
+
+    const sliceNums = [...new Set(filtered.map(r => r.slice_number))].sort((a, b) => a - b);
+    const modalities = MODALITY_ORDER.filter(m => filtered.some(r => r.modality === m));
+    const colorMap = buildMethodColorMap(order);
+
+    // Use the largest slice number
+    const maxSlice = sliceNums[sliceNums.length - 1];
+    const sliceFiltered = filtered.filter(r => r.slice_number === maxSlice);
+
+    const traces = [];
+    for (const method of order) {
+        const methodData = sliceFiltered.filter(r => r.benchmark_name_clean === method);
+        if (methodData.length === 0) continue;
+
+        for (const [mi, mod] of modalities.entries()) {
+            const modData = methodData.filter(r => r.modality === mod);
+            if (modData.length === 0) continue;
+
+            traces.push({
+                type: 'box',
+                y: modData.map(r => r.value),
+                name: method,
+                legendgroup: method,
+                showlegend: mi === 0,
+                marker: { color: colorMap[method] },
+                boxpoints: 'outliers',
+                xaxis: `x${mi > 0 ? mi + 1 : ''}`,
+                yaxis: `y${mi > 0 ? mi + 1 : ''}`,
+            });
+        }
+    }
+
+    const layout = makeSubplotLayout(modalities, 'Time (s)');
+    layout.title = { text: `Slice Distributions (largest slice range, slice #${maxSlice})`, font: { size: 13 } };
+    Plotly.newPlot(divId, traces, layout, { responsive: true });
+}
+
+// ------- 3. HEATMAPS -------
+
+function plotHeatmaps(data) {
+    const readData = filterByType(data, 'time_remote_file_reading');
+    const sliceData = filterByType(data, 'time_remote_slicing');
+
+    plotHeatmap(readData, DEFAULT_BENCHMARK_ORDER, 'plot-heatmap-read', 'Remote File Opening (h5py level)');
+    plotHeatmap(readData, PYNWB_READ_ORDER, 'plot-heatmap-pynwb', 'Remote File Opening (PyNWB level)');
+
+    // For slicing, use largest slice number
+    const maxSlice = Math.max(...sliceData.filter(r => r.slice_number !== null).map(r => r.slice_number), 0);
+    const sliceFiltered = sliceData.filter(r => r.slice_number === maxSlice);
+    plotHeatmap(sliceFiltered, PYNWB_READ_ORDER, 'plot-heatmap-slice', `Remote Slicing (largest range, slice #${maxSlice})`);
+}
+
+function plotHeatmap(data, order, divId, title) {
+    const orderSet = new Set(order);
+    const filtered = data.filter(r => orderSet.has(r.benchmark_name_clean) && r.modality);
+
+    if (filtered.length === 0) {
+        plotEmpty(divId, 'No data for heatmap');
+        return;
+    }
+
+    const modalities = MODALITY_ORDER.filter(m => filtered.some(r => r.modality === m));
+
+    // Build pivot: methods × modalities, values = mean
+    const methods = order.filter(m => filtered.some(r => r.benchmark_name_clean === m));
+    const z = [];
+    const annotations = [];
+
+    for (const [mi, method] of methods.entries()) {
+        const row = [];
+        for (const [mj, mod] of modalities.entries()) {
+            const vals = filtered.filter(r => r.benchmark_name_clean === method && r.modality === mod).map(r => r.value);
+            const avg = vals.length > 0 ? mean(vals) : NaN;
+            row.push(avg);
+            annotations.push({
+                x: mod,
+                y: method,
+                text: isNaN(avg) ? '' : avg < 0.01 ? avg.toExponential(2) : avg.toFixed(3),
+                showarrow: false,
+                font: { color: avg > (mean(filtered.map(r => r.value)) * 0.7) ? 'white' : 'black', size: 11 },
+            });
+        }
+        z.push(row);
+    }
+
+    // Find min per column and add star
+    for (let mj = 0; mj < modalities.length; mj++) {
+        let minVal = Infinity, minIdx = -1;
+        for (let mi = 0; mi < methods.length; mi++) {
+            if (z[mi][mj] < minVal && !isNaN(z[mi][mj])) {
+                minVal = z[mi][mj];
+                minIdx = mi;
+            }
+        }
+        if (minIdx >= 0) {
+            const ann = annotations.find(a => a.x === modalities[mj] && a.y === methods[minIdx]);
+            if (ann) ann.text += ' ★';
+        }
+    }
+
+    const trace = {
+        type: 'heatmap',
+        z: z,
+        x: modalities,
+        y: methods,
+        colorscale: 'OrRd',
+        hoverongaps: false,
+        showscale: true,
+    };
+
+    const layout = {
+        title: { text: title, font: { size: 14 } },
+        annotations: annotations,
+        height: Math.max(300, methods.length * 35 + 100),
+        margin: { l: 250, r: 60, t: 50, b: 60 },
+        font: { family: 'Arial, sans-serif', size: 11 },
+        xaxis: { side: 'bottom' },
+        yaxis: { autorange: 'reversed' },
+    };
+
+    Plotly.newPlot(divId, [trace], layout, { responsive: true });
+}
+
+// ------- 4. PERFORMANCE ACROSS VERSIONS -------
+
+function plotVersions(data) {
+    const readData = filterByType(data, 'time_remote_file_reading');
+    const sliceData = filterByType(data, 'time_remote_slicing');
+
+    plotPerformanceOverTime(readData, 'plot-versions-read', 'File Reading');
+    plotPerformanceOverTime(sliceData, 'plot-versions-slice', 'Slicing');
+}
+
+function plotPerformanceOverTime(data, divId, titlePrefix) {
+    // Build reverse map of environment_id -> timepoint label
+    const envTimepointMap = {};
+    for (const [label, hash] of Object.entries(ENVIRONMENT_TIMEPOINTS)) {
+        envTimepointMap[hash] = label;
+    }
+
+    const timepointIds = new Set(Object.values(ENVIRONMENT_TIMEPOINTS));
+    const filtered = data.filter(r => timepointIds.has(r.environment_id) && r.modality);
+
+    if (filtered.length === 0) {
+        plotEmpty(divId, 'No data matching environment timepoints');
+        return;
+    }
+
+    // Add timepoint label
+    const withTimepoint = filtered.map(r => ({
+        ...r,
+        environment_timepoint: envTimepointMap[r.environment_id] || r.environment_id,
+    }));
+
+    const modalities = MODALITY_ORDER.filter(m => withTimepoint.some(r => r.modality === m));
+    const order = PYNWB_READ_ORDER;
+    const colorMap = buildMethodColorMap(order);
+    const timepoints = Object.keys(ENVIRONMENT_TIMEPOINTS).sort();
+
+    const traces = [];
+    for (const method of order) {
+        const methodData = withTimepoint.filter(r => r.benchmark_name_clean === method);
+        if (methodData.length === 0) continue;
+
+        for (const [mi, mod] of modalities.entries()) {
+            const modData = methodData.filter(r => r.modality === mod);
+            if (modData.length === 0) continue;
+
+            const byTp = groupBy(modData, 'environment_timepoint');
+            const xs = [];
+            const ys = [];
+            for (const tp of timepoints) {
+                if (byTp[tp]) {
+                    xs.push(tp);
+                    ys.push(mean(byTp[tp].map(r => r.value)));
+                }
+            }
+
+            traces.push({
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: xs,
+                y: ys,
+                name: method,
+                legendgroup: method,
+                showlegend: mi === 0,
+                line: { color: colorMap[method] },
+                marker: { color: colorMap[method], size: 8 },
+                xaxis: `x${mi > 0 ? mi + 1 : ''}`,
+                yaxis: `y${mi > 0 ? mi + 1 : ''}`,
+            });
+        }
+    }
+
+    if (traces.length === 0) {
+        plotEmpty(divId, 'No data across versions');
+        return;
+    }
+
+    const layout = makeSubplotLayout(modalities, 'Time (s)');
+    layout.height = 450;
+    layout.title = { text: `${titlePrefix} Performance Across Environment Versions`, font: { size: 13 } };
+    Plotly.newPlot(divId, traces, layout, { responsive: true });
+}
+
+// ------- 5. DOWNLOAD VS STREAM -------
+
+function plotDownloadVsStream(data) {
+    const remoteSliceData = filterByType(data, 'time_remote_slicing');
+    const remoteReadData = filterByType(data, 'time_remote_file_reading');
+    const localSliceData = filterByType(data, 'time_local_slicing');
+    const localReadData = filterByType(data, 'time_local_file_reading');
+    const downloadData = filterByType(data, 'time_download');
+
+    if (remoteSliceData.length === 0 && localSliceData.length === 0) {
+        plotEmpty('plot-download-vs-stream', 'No slicing data available for comparison');
+        return;
+    }
+
+    // Compute remote: avg_open_time + slice per slice_number
+    const remoteAvgOpen = {};
+    const remoteReadGrouped = groupBy(remoteReadData, r => `${r.modality}|${r.benchmark_name_clean}`);
+    for (const [key, recs] of Object.entries(remoteReadGrouped)) {
+        remoteAvgOpen[key] = mean(recs.map(r => r.value));
+    }
+
+    // Compute local: avg_open_time + slice + download per slice_number
+    const localAvgOpen = {};
+    const localReadGrouped = groupBy(localReadData, r => `${r.modality}|${r.benchmark_name_clean}`);
+    for (const [key, recs] of Object.entries(localReadGrouped)) {
+        localAvgOpen[key] = mean(recs.map(r => r.value));
+    }
+
+    // Avg download time per modality + method
+    const downloadAvg = {};
+    const downloadGrouped = groupBy(downloadData, r => `${r.modality}|${r.benchmark_name_clean}`);
+    for (const [key, recs] of Object.entries(downloadGrouped)) {
+        downloadAvg[key] = mean(recs.map(r => r.value));
+    }
+
+    const modalities = MODALITY_ORDER.filter(m =>
+        remoteSliceData.some(r => r.modality === m) || localSliceData.some(r => r.modality === m)
+    );
+    const order = PYNWB_READ_ORDER;
+    const colorMap = buildMethodColorMap(order);
+
+    const traces = [];
+    const annotations = [];
+
+    for (const method of order) {
+        const remoteSlice = remoteSliceData.filter(r =>
+            r.benchmark_name_clean === method && r.slice_number !== null
+        );
+        if (remoteSlice.length === 0) continue;
+
+        for (const [mi, mod] of modalities.entries()) {
+            const modRemote = remoteSlice.filter(r => r.modality === mod);
+            if (modRemote.length === 0) continue;
+
+            const openKey = `${mod}|${method}`;
+            const avgOpen = remoteAvgOpen[openKey] || 0;
+
+            // Group by slice_number, compute mean total_time
+            const bySlice = groupBy(modRemote, 'slice_number');
+            const sliceNums = Object.keys(bySlice).map(Number).sort((a, b) => a - b);
+            // Add baseline at 0
+            const xs = [0, ...sliceNums];
+            const ys = [avgOpen, ...sliceNums.map(sn => mean(bySlice[sn].map(r => r.value)) + avgOpen)];
+
+            traces.push({
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: xs,
+                y: ys,
+                name: `${method} (stream)`,
+                legendgroup: method,
+                showlegend: mi === 0,
+                line: { color: colorMap[method] },
+                marker: { color: colorMap[method], size: 5 },
+                xaxis: `x${mi > 0 ? mi + 1 : ''}`,
+                yaxis: `y${mi > 0 ? mi + 1 : ''}`,
+            });
+
+            // Try to find matching local data
+            // The local benchmark_name_clean is usually the first word of the method + " "
+            const firstWord = method.split(' ')[0];
+            const localKey = `${mod}|${firstWord} `;
+            const localOpen = localAvgOpen[localKey] || 0;
+
+            // Find download time - adjust method name like Python code does
+            const downloadKey = `${mod}|${method.replace('pynwb', 'dandi api')}`;
+            const dlTime = downloadAvg[downloadKey] || 0;
+
+            if (localOpen > 0 || dlTime > 0) {
+                const localModSlice = localSliceData.filter(r =>
+                    r.modality === mod && r.benchmark_name_clean.startsWith(firstWord) && r.slice_number !== null
+                );
+                if (localModSlice.length > 0) {
+                    const localBySlice = groupBy(localModSlice, 'slice_number');
+                    const localSliceNums = Object.keys(localBySlice).map(Number).sort((a, b) => a - b);
+                    const localXs = [0, ...localSliceNums];
+                    const localYs = [dlTime + localOpen, ...localSliceNums.map(sn =>
+                        mean(localBySlice[sn].map(r => r.value)) + localOpen + dlTime
+                    )];
+
+                    traces.push({
+                        type: 'scatter',
+                        mode: 'lines',
+                        x: localXs,
+                        y: localYs,
+                        name: `${method} (download+local)`,
+                        legendgroup: method + '_local',
+                        showlegend: mi === 0,
+                        line: { color: colorMap[method], dash: 'dash' },
+                        xaxis: `x${mi > 0 ? mi + 1 : ''}`,
+                        yaxis: `y${mi > 0 ? mi + 1 : ''}`,
+                    });
+                }
+            }
+        }
+    }
+
+    if (traces.length === 0) {
+        plotEmpty('plot-download-vs-stream', 'Insufficient data for comparison');
+        return;
+    }
+
+    const layout = makeSubplotLayout(modalities, 'Time (s)');
+    layout.height = 500;
+    layout.title = { text: 'Streaming vs Download+Local', font: { size: 13 } };
+    layout.annotations = annotations;
+    Plotly.newPlot('plot-download-vs-stream', traces, layout, { responsive: true });
+}
+
+// ------- 6. NETWORK TRACKING -------
+
+function plotNetworkTracking(data) {
+    const netReadData = filterByType(data, 'network_tracking_remote_file_reading');
+    const netSliceData = filterByType(data, 'network_tracking_remote_slicing');
+
+    if (netReadData.length === 0) {
+        plotEmpty('plot-network-read', 'No network tracking data for file reading');
+    } else {
+        plotNetworkMetrics(netReadData, 'plot-network-read', 'File Reading Network Metrics');
+    }
+
+    if (netSliceData.length === 0) {
+        plotEmpty('plot-network-slice', 'No network tracking data for slicing');
+    } else {
+        plotNetworkMetrics(netSliceData, 'plot-network-slice', 'Slicing Network Metrics');
+    }
+}
+
+function plotNetworkMetrics(data, divId, title) {
+    // Group by variable (different network metrics)
+    const variables = [...new Set(data.map(r => r.variable))].filter(v => v !== 'time');
+    if (variables.length === 0) {
+        plotEmpty(divId, 'No network variables found');
+        return;
+    }
+
+    const order = DEFAULT_BENCHMARK_ORDER;
+    const orderSet = new Set(order);
+    const filtered = data.filter(r => orderSet.has(r.benchmark_name_clean) && r.modality);
+    const modalities = MODALITY_ORDER.filter(m => filtered.some(r => r.modality === m));
+    const colorMap = buildMethodColorMap(order);
+
+    // Create one subplot row per variable, one column per modality
+    const nRows = variables.length;
+    const nCols = modalities.length;
+
+    const traces = [];
+    const layout = {
+        height: nRows * 250 + 100,
+        margin: { t: 50, b: 60, l: 80, r: 20 },
+        title: { text: title, font: { size: 14 } },
+        legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center' },
+        font: { family: 'Arial, sans-serif', size: 10 },
+        grid: { rows: nRows, columns: nCols, pattern: 'independent' },
+    };
+
+    for (let vi = 0; vi < variables.length; vi++) {
+        const variable = variables[vi];
+        const varData = filtered.filter(r => r.variable === variable);
+
+        for (let mi = 0; mi < modalities.length; mi++) {
+            const mod = modalities[mi];
+            const axisIdx = vi * nCols + mi + 1;
+
+            for (const method of order) {
+                const methodModData = varData.filter(r =>
+                    r.benchmark_name_clean === method && r.modality === mod
+                );
+                if (methodModData.length === 0) continue;
+
+                traces.push({
+                    type: 'box',
+                    y: methodModData.map(r => r.value),
+                    name: method,
+                    legendgroup: method,
+                    showlegend: vi === 0 && mi === 0,
+                    marker: { color: colorMap[method] },
+                    boxpoints: false,
+                    xaxis: `x${axisIdx}`,
+                    yaxis: `y${axisIdx}`,
+                });
+            }
+
+            layout[`xaxis${axisIdx}`] = {
+                title: vi === variables.length - 1 ? mod : '',
+                showticklabels: false,
+            };
+            layout[`yaxis${axisIdx}`] = {
+                title: mi === 0 ? variable.replace(/_/g, ' ') : '',
+            };
+
+            // Add annotation as subplot title
+            if (vi === 0) {
+                if (!layout.annotations) layout.annotations = [];
+                layout.annotations.push({
+                    text: mod,
+                    x: (mi + 0.5) / nCols,
+                    y: 1.02,
+                    xref: 'paper',
+                    yref: 'paper',
+                    showarrow: false,
+                    font: { size: 12, weight: 'bold' },
+                });
+            }
+        }
+    }
+
+    Plotly.newPlot(divId, traces, layout, { responsive: true });
+}
+
+// ------- UTILITY -------
+
+function plotEmpty(divId, message) {
+    const div = document.getElementById(divId);
+    if (div) {
+        div.innerHTML = `<div class="empty-state"><p>${message}</p></div>`;
+    }
+}
+</script>
+
+</body>
+</html>
